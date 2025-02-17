@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "dental-pano-ai"
+version = "0.1.0"
+description = ""
+authors = ["Harry Hsu <h@stmharry.io>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+# detectron2
+torch = "2.6.0"
+torchvision = "^0.21.0"
+detectron2 = { version = "0.6+2a420edpt2.6.0cu126", source = "miropsota" }
+opencv-python = "^4.11.0.86"
+pillow = "9.5.0"
+
+# yolo
+ultralytics = "^8.3.75"
+
+# utils
+absl-py = "^2.1.0"
+pipe = "^2.2"
+
+[[tool.poetry.source]]
+name = "miropsota"
+url = "https://miropsota.github.io/torch_packages_builder"
+priority = "supplemental"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
