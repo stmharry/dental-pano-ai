@@ -8,8 +8,12 @@ import numpy as np
 import pandas as pd
 from absl import app, flags, logging
 from detectron2.config import CfgNode, get_cfg
+from detectron2.data import Metadata as Detectron2Metadata
 from detectron2.engine import DefaultPredictor
 from detectron2.projects.deeplab import add_deeplab_config
+from detectron2.structures import Instances as Detectron2Instances
+from detectron2.utils.visualizer import ColorMode, VisImage, Visualizer
+from matplotlib import colormaps as cmaps
 from PIL import Image
 from ultralytics.engine.results import Results
 from ultralytics.models.yolo.segment import SegmentationPredictor
@@ -26,6 +30,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("yolo_config", "./models/yolo/config.yaml", "YOLO config file.")
 flags.DEFINE_string("yolo_weights", "./models/yolo/model.pt", "YOLO weights file.")
 flags.DEFINE_string("device", "cpu", "Device to use.")
+flags.DEFINE_bool("debug", False, "Debug mode.")
 FLAGS = flags.FLAGS
 
 
@@ -43,6 +48,8 @@ class SemanticSegmentationModule(object):
     weights_path: str
     device: str = "cpu"
 
+    debug: bool = False
+
     predictor: DefaultPredictor = dataclasses.field(init=False)
 
     def __post_init__(self):
@@ -59,10 +66,47 @@ class SemanticSegmentationModule(object):
 
         self.predictor = DefaultPredictor(cfg)
 
-    def __call__(self, image: np.ndarray) -> SemanticSegmentationPrediction:
+    def __call__(
+        self, image: np.ndarray, output_dir: Path
+    ) -> SemanticSegmentationPrediction:
         prob: np.ndarray = self.predictor(image)["sem_seg"].softmax(dim=0).numpy()
 
-        return SemanticSegmentationPrediction(prob=prob)
+        pred = SemanticSegmentationPrediction(prob=prob)
+        if self.debug:
+            self.visualize(
+                image=image,
+                pred=pred,
+                path=Path(output_dir, "semantic-segmentation.jpg"),
+            )
+
+        return pred
+
+    def visualize(
+        self, image: np.ndarray, pred: SemanticSegmentationPrediction, path: Path
+    ) -> None:
+        path.parent.mkdir(exist_ok=True, parents=True)
+
+        prob: np.ndarray = pred.prob
+        num_classes: int = len(prob)
+
+        stuff_classes: list[Any] = [None] * num_classes
+        stuff_colors = (
+            np.r_[
+                "0,2,-1",
+                [0, 0, 0, 0],
+                cmaps["rainbow"](np.linspace(0, 1, num_classes - 1)),  # type: ignore
+            ]
+            .__mul__(255)
+            .astype(np.uint8)
+            .tolist()
+        )
+
+        metadata = Detectron2Metadata(
+            stuff_classes=stuff_classes, stuff_colors=stuff_colors
+        )
+        visualizer = Visualizer(image, metadata=metadata)
+        image_vis: VisImage = visualizer.draw_sem_seg(np.argmax(prob, axis=0))
+        image_vis.save(path)
 
 
 # instance detection
@@ -148,6 +192,7 @@ class InstanceDetectionPredictionInstance(object):
 
 @dataclasses.dataclass(kw_only=True)
 class InstanceDetectionPrediction(object):
+    category_id_to_name: dict[int, str]
     instances: list[InstanceDetectionPredictionInstance]
 
     @classmethod
@@ -177,12 +222,13 @@ class InstanceDetectionPrediction(object):
             )
         ]
 
-        return cls(instances=instances)
+        return cls(category_id_to_name=results.names, instances=instances)
 
     def sort_by_score(
         self, direction: Literal["ASCENDING", "DESCENDING"] = "DESCENDING"
     ) -> "InstanceDetectionPrediction":
         return InstanceDetectionPrediction(
+            category_id_to_name=self.category_id_to_name,
             instances=sorted(
                 self.instances,
                 key=lambda instance: instance.score,
@@ -192,6 +238,7 @@ class InstanceDetectionPrediction(object):
 
     def filter_by_category(self, regex: Any) -> "InstanceDetectionPrediction":
         return InstanceDetectionPrediction(
+            category_id_to_name=self.category_id_to_name,
             instances=[
                 instance
                 for instance in self.instances
@@ -199,12 +246,19 @@ class InstanceDetectionPrediction(object):
             ],
         )
 
-    def filter_by_area(self, threshold: int = 0) -> "InstanceDetectionPrediction":
+    def filter_by_area(self, min_area: int = 0) -> "InstanceDetectionPrediction":
         return InstanceDetectionPrediction(
+            category_id_to_name=self.category_id_to_name,
             instances=[
-                instance
-                for instance in self.instances
-                if instance.mask_area > threshold
+                instance for instance in self.instances if instance.mask_area > min_area
+            ],
+        )
+
+    def filter_by_score(self, min_score: float = 0) -> "InstanceDetectionPrediction":
+        return InstanceDetectionPrediction(
+            category_id_to_name=self.category_id_to_name,
+            instances=[
+                instance for instance in self.instances if instance.score > min_score
             ],
         )
 
@@ -230,7 +284,31 @@ class InstanceDetectionPrediction(object):
             instances = _instances
             max_instances.append(instance)
 
-        return InstanceDetectionPrediction(instances=max_instances)
+        return InstanceDetectionPrediction(
+            category_id_to_name=self.category_id_to_name, instances=max_instances
+        )
+
+    def to_detectron2_instances(
+        self,
+    ) -> Detectron2Instances:
+
+        image_sizes: set[tuple[int, int]] = set(
+            instance.mask.shape for instance in self.instances
+        )
+        if len(image_sizes) > 1:
+            raise ValueError(f"Image sizes are not consistent: {image_sizes}")
+
+        image_size: tuple[int, int] = image_sizes.pop()
+
+        return Detectron2Instances(
+            image_size=image_size,
+            scores=np.asarray([instance.score for instance in self.instances]),
+            pred_boxes=np.asarray([instance.bbox_xyxy for instance in self.instances]),
+            pred_classes=np.asarray(
+                [instance.category_id for instance in self.instances]
+            ),
+            pred_masks=np.asarray([instance.mask for instance in self.instances]),
+        )
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -243,6 +321,9 @@ class InstanceDetectionModule(object):
     max_det: int = 500
     retina_masks: bool = True
     device: str = "cpu"
+
+    debug: bool = False
+    debug_conf: float = 0.01
 
     predictor: SegmentationPredictor = dataclasses.field(init=False)
 
@@ -268,10 +349,52 @@ class InstanceDetectionModule(object):
 
         self.predictor = predictor
 
-    def __call__(self, image: np.ndarray) -> InstanceDetectionPrediction:
+    def __call__(
+        self, image: np.ndarray, output_dir: Path
+    ) -> InstanceDetectionPrediction:
         results: Results = list(self.predictor(image))[0]  # type: ignore
 
-        return InstanceDetectionPrediction.from_ultralytics_results(results)
+        pred = InstanceDetectionPrediction.from_ultralytics_results(results)
+        if self.debug:
+            self.visualize(
+                image=image, pred=pred, path=Path(output_dir, "instance-detection.jpg")
+            )
+
+        return pred
+
+    def visualize(
+        self, image: np.ndarray, pred: InstanceDetectionPrediction, path: Path
+    ) -> None:
+        path.parent.mkdir(exist_ok=True, parents=True)
+
+        pred = pred.filter_by_category(r"^(?!TOOTH).*$").filter_by_score(
+            min_score=self.debug_conf
+        )
+
+        thing_classes: list[Any] = [None] * (max(pred.category_id_to_name.keys()) + 1)
+        for instance in pred.instances:
+            thing_classes[instance.category_id] = instance.category_name
+
+        thing_colors = (
+            cmaps["rainbow"](np.linspace(0, 1, len(thing_classes)))  # type: ignore
+            .__mul__(255)
+            .astype(np.uint8)
+            .tolist()
+        )
+
+        metadata = Detectron2Metadata(
+            thing_classes=thing_classes, thing_colors=thing_colors
+        )
+        visualizer = Visualizer(
+            image,
+            metadata=metadata,
+            scale=1.0,
+            instance_mode=ColorMode.SEGMENTATION,
+        )
+        image_vis: VisImage = visualizer.draw_instance_predictions(
+            pred.to_detectron2_instances()
+        )
+        image_vis.save(path)
 
 
 # post-processing
@@ -420,11 +543,13 @@ def main(_):
         config_path=FLAGS.deeplab_config,
         weights_path=FLAGS.deeplab_weights,
         device=FLAGS.device,
+        debug=FLAGS.debug,
     )
     insdet_module: InstanceDetectionModule = InstanceDetectionModule(
         config_path=FLAGS.yolo_config,
         weights_path=FLAGS.yolo_weights,
         device=FLAGS.device,
+        debug=FLAGS.debug,
     )
     postproc_module: PostProcessingModule = PostProcessingModule()
 
@@ -447,13 +572,19 @@ def main(_):
 
     for image_path in sorted(image_paths):
         csv_path: Path = Path(output_dir, image_path.with_suffix(".csv").name)
+        image_output_dir: Path = Path(output_dir, image_path.stem)
+
         logging.info(f"Processing {image_path}, saving to {csv_path}")
 
         image_pil: Image.Image = Image.open(image_path).convert("RGB")
         image: np.ndarray = np.asarray(image_pil)
 
-        semseg_pred: SemanticSegmentationPrediction = semseg_module(image)
-        insdet_pred: InstanceDetectionPrediction = insdet_module(image)
+        semseg_pred: SemanticSegmentationPrediction = semseg_module(
+            image, output_dir=image_output_dir
+        )
+        insdet_pred: InstanceDetectionPrediction = insdet_module(
+            image, output_dir=image_output_dir
+        )
         finding_entries: list[FindingEntry] = postproc_module(semseg_pred, insdet_pred)
 
         assessment: FindingAssessment = FindingAssessment(
