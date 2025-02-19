@@ -6,8 +6,6 @@ This repository provides inference code for the following research paper:
 
 The system automates the assessment of dental findings in panoramic radiographs (DPRs), detecting conditions such as missing teeth, caries, and implants.
 
-## Sample Results
-
 <img src="./data/pan-01432.jpg" alt="Sample DPR Image">
 <img src="./assets/semantic-segmentation.jpg" alt="Semantic Segmentation Output">
 <img src="./assets/instance-detection.jpg" alt="Instance Detection Output">
@@ -28,7 +26,7 @@ This repository has been tested on Ubuntu 22.04 but should be functional on othe
 
 2. Install dependencies using [Poetry](https://python-poetry.org).
     ```bash
-    poetry install
+    poetry install && poetry shell
     ```
 
 3. Download [pre-trained models](https://dental-pano-ai.s3.ap-southeast-1.amazonaws.com/models.tar.gz).
