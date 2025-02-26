@@ -10,9 +10,9 @@ package-mode = false
 python = "^3.11"
 
 # detectron2
-torch = "2.6.0"
-torchvision = "^0.21.0"
-detectron2 = { version = "0.6+2a420edpt2.6.0cu126", source = "miropsota" }
+torch = "2.6.0+cpu"
+torchvision = "0.21.0+cpu"
+detectron2 = { version = "0.6+2a420edpt2.6.0cpu", source = "miropsota" }
 matplotlib = "^3.10.0"
 opencv-python-headless = "^4.11.0.86"
 pillow = "9.5.0"
