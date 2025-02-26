@@ -64,6 +64,27 @@ This repository has been tested on Ubuntu 22.04 but should be functional on othe
       --[no]debug          Enable debugging mode (default: false)
     ```
 
+## Option 2 -- Running with Docker
+
+1. Build the Docker Image
+Build the Docker image using the tag `dental-pano-ai:python311`:
+```bash
+docker build -t dental-pano-ai:python311 .
+```
+
+2. Run the Docker Container
+```bash
+docker run --rm \
+    -v ./data/:/workspace/dental-pano-ai/data \
+    -v ./results:/workspace/dental-pano-ai/results \
+    --name dental_pano_ai dental-pano-ai:python311 \
+    poetry run python main.py
+```
+
+Notes:
+- You can customize the command (e.g., by adding options) just as in the previous setup right after `poetry run python main.py`
+
+
 ## Additional Information
 This repository contains only inference (testing) code. Training scripts are not included. For inquiries about training or further details, contact [stmharry@alum.mit.edu](mailto:stmharry@alum.mit.edu).
 
