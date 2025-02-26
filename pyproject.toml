@@ -1,9 +1,10 @@
 [tool.poetry]
 name = "dental-pano-ai"
 version = "0.1.0"
-description = ""
+description = "AI-powered diagnostic tool for automated dental assessments using panoramic radiographs (DPRs). Detects missing teeth, caries, implants, and more. 🏥🤖 Built with DeepLab and YOLO."
 authors = ["Harry Hsu <h@stmharry.io>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
