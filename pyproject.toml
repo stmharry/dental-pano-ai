@@ -14,7 +14,7 @@ torch = "2.6.0"
 torchvision = "^0.21.0"
 detectron2 = { version = "0.6+2a420edpt2.6.0cu126", source = "miropsota" }
 matplotlib = "^3.10.0"
-opencv-python = "^4.11.0.86"
+opencv-python-headless = "^4.11.0.86"
 pillow = "9.5.0"
 
 # yolo
@@ -27,6 +27,11 @@ pandas = "^2.2.3"
 [[tool.poetry.source]]
 name = "miropsota"
 url = "https://miropsota.github.io/torch_packages_builder"
+priority = "supplemental"
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl"
 priority = "supplemental"
 
 [build-system]
