@@ -29,7 +29,6 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("yolo_config", "./models/yolo/config.yaml", "YOLO config file.")
 flags.DEFINE_string("yolo_weights", "./models/yolo/model.pt", "YOLO weights file.")
-flags.DEFINE_string("device", "cpu", "Device to use.")
 flags.DEFINE_bool("debug", False, "Debug mode.")
 FLAGS = flags.FLAGS
 
@@ -47,7 +46,6 @@ class SemanticSegmentationModule(object):
     config_path: str
     weights_path: str
     device: str = "cpu"
-
     debug: bool = False
 
     predictor: DefaultPredictor = dataclasses.field(init=False)
@@ -321,7 +319,6 @@ class InstanceDetectionModule(object):
     max_det: int = 500
     retina_masks: bool = True
     device: str = "cpu"
-
     debug: bool = False
     debug_conf: float = 0.01
 
@@ -542,13 +539,11 @@ def main(_):
     semseg_module: SemanticSegmentationModule = SemanticSegmentationModule(
         config_path=FLAGS.deeplab_config,
         weights_path=FLAGS.deeplab_weights,
-        device=FLAGS.device,
         debug=FLAGS.debug,
     )
     insdet_module: InstanceDetectionModule = InstanceDetectionModule(
         config_path=FLAGS.yolo_config,
         weights_path=FLAGS.yolo_weights,
-        device=FLAGS.device,
         debug=FLAGS.debug,
     )
     postproc_module: PostProcessingModule = PostProcessingModule()
