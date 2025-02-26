@@ -10,14 +10,28 @@ The system automates the assessment of dental findings in panoramic radiographs 
 <img src="./assets/semantic-segmentation.jpg" alt="Semantic Segmentation Output">
 <img src="./assets/instance-detection.jpg" alt="Instance Detection Output">
 
-## Prerequisites
+## Quick Start Using Docker
+
+You will need [Docker](https://docs.docker.com/get-docker/) installed on your system.
+Run the following command to start the container:
+
+```bash
+docker run --rm -v $(pwd)/data:/app/data -v $(pwd)/results:/app/results stmharry/dental-pano-ai --debug
+```
+
+The DPR images in the `./data/` directory will be processed, and the results will be saved in the `./results/` directory.
+See below for customizing options.
+
+## Manual Installation
+
+### Prerequisites
 
 - Python 3.11
 - [Poetry](https://python-poetry.org) package manager
 
 This repository has been tested on Ubuntu 22.04 but should be functional on other platforms.
 
-## Getting Started
+### Instructions
 
 1. Clone the repository.
     ```bash
@@ -60,12 +74,14 @@ This repository has been tested on Ubuntu 22.04 but should be functional on othe
       --deeplab_weights    Path to DeepLab model weights (default: './models/deeplab/model.pth')
       --yolo_config        Path to YOLO config file (default: './models/yolo/config.yaml')
       --yolo_weights       Path to YOLO model weights (default: './models/yolo/model.pt')
-      --device             Device to use: 'cpu' or 'cuda' (default: 'cpu')
       --[no]debug          Enable debugging mode (default: false)
     ```
 
 ## Additional Information
-This repository contains only inference (testing) code. Training scripts are not included. For inquiries about training or further details, contact [stmharry@alum.mit.edu](mailto:stmharry@alum.mit.edu).
+This repository contains only inference (testing) code.
+Training scripts are not included.
+For ease of use, all libraries are installed using CPU-only versions.
+For inquiries about training or further details, contact [stmharry@alum.mit.edu](mailto:stmharry@alum.mit.edu).
 
 ## Citation
 If you use this work, please cite the following paper:
